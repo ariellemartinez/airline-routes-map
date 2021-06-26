@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Routes from U.S. Airports | World101</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script> 
+<script src="arc.js"></script>
+<style>
+#map {
+    height: 100%;
+}
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://d3js.org/d3-dsv.v1.min.js"></script> 
+<script src="https://d3js.org/d3-fetch.v1.min.js"></script> 
+<script>
+	
+var map = L.map("map").setView([45, -45], 3);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "Imagery © <a href='https://www.openstreetmap.org/copyright' target='_blank'>OpenStreetMap contributors</a>, Data &copy; <a href='https://openflights.org/' target='_blank'>OpenFlights.org</a>",
+}).addTo(map);
+
+var pairs = []
+
+d3.csv("airports.csv").then(function (airportsData) {
+  d3.csv("routes.csv").then(function (routesData) {
+    var dataHash = airportsData.reduce(function (hash, item) {
+      hash[item["IATA"]] = [Number(item.Latitude), Number(item.Longitude)];
+      return hash;
+    }, {});
+    var countryHash = airportsData.reduce(function (hash, item) {
+      hash[item["IATA"]] = item.Country;
+      return hash;
+    }, {});
+    routesData.forEach(function (item) {
+      if (countryHash[item["Source airport"]] === "United States") {
+        item["Source airport coordinates"] = dataHash[item["Source airport"]];
+        item["Destination airport coordinates"] = dataHash[item["Destination airport"]];
+        if (item["Destination airport coordinates"] && item["Source airport coordinates"]) {
+          var pair = [item["Source airport coordinates"], item["Destination airport coordinates"]]
+          pairs.push(pair);
+        }
+      }
+    });
+
+    function obj(ll) {
+      return {
+        y: ll[0],
+        x: ll[1]
+      };
+    }
+
+    for (var i = 0; i < pairs.length; i++) {
+      var generator = new arc.GreatCircle(
+        obj(pairs[i][0]),
+        obj(pairs[i][1]));
+      var line = generator.Arc(100, {
+        offset: 10
+      });
+      var newLine = L.polyline(line.geometries[0].coords.map(function (c) {
+          return c.reverse();
+        }), {
+          color: "#04284a",
+          weight: 0.1,
+          opacity: 0.7
+        })
+        .addTo(map);
+    }
+  });
+});
+
+</script>
+</body>
+</html>
